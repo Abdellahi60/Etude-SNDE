@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>SNDE — Cartographie Abonnés Nouakchott</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2230;
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.13);
+  --text:#e6edf3;--muted:#8b949e;
+  --accent:#1a8cff;--teal:#1fd5a0;--red:#f85149;
+  --orange:#e3a93b;--purple:#9b72e8;--green:#3fb950;--pink:#e57373;
+  --r:10px;--rl:16px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;overflow-x:hidden}
+.shell{display:flex;flex-direction:column;height:100vh}
+
+/* HEADER */
+header{display:flex;align-items:center;gap:16px;padding:13px 22px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#1a8cff,#0d5cbf);display:flex;align-items:center;justify-content:center}
+.logo svg{width:18px;height:18px;fill:#fff}
+.htitle h1{font-size:14px;font-weight:600;letter-spacing:-.2px}
+.htitle p{font-size:11px;color:var(--muted);margin-top:1px}
+.hright{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:500;color:var(--teal);background:rgba(31,213,160,.1);border:1px solid rgba(31,213,160,.2);padding:3px 10px;border-radius:20px}
+.live span{width:6px;height:6px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.btn-imp{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text);background:var(--bg3);border:1px solid var(--border2);padding:5px 13px;border-radius:var(--r);cursor:pointer;transition:border-color .15s}
+.btn-imp:hover{border-color:var(--accent)}
+
+/* NAV */
+nav{display:flex;padding:0 22px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:all .15s;white-space:nowrap}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab:hover:not(.active){color:var(--text)}
+
+/* KPI BAR */
+.kpis{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border);flex-shrink:0}
+.kpi{background:var(--bg2);padding:11px 15px}
+.kpi-l{font-size:10px;color:var(--muted);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
+.kpi-v{font-size:19px;font-weight:600;font-family:'DM Mono',monospace}
+.kpi-s{font-size:10px;color:var(--muted);margin-top:2px}
+.c-blue{color:var(--accent)}.c-red{color:var(--red)}.c-orange{color:var(--orange)}
+.c-teal{color:var(--teal)}.c-purple{color:var(--purple)}
+
+/* LAYOUT */
+.content{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.view{display:none;flex:1;overflow:hidden}
+.view.active{display:flex;flex-direction:column}
+
+/* MAP */
+#view-map{flex-direction:row}
+#the-map{flex:1}
+.sidebar{width:310px;flex-shrink:0;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+.sb-head{padding:13px 15px 9px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-head h2{font-size:13px;font-weight:600}
+.sb-head p{font-size:11px;color:var(--muted);margin-top:2px}
+.clist{overflow-y:auto;flex:1;padding:8px}
+.ccard{padding:11px 13px;border-radius:var(--r);border:1px solid var(--border);margin-bottom:6px;cursor:pointer;transition:all .15s;background:var(--bg3)}
+.ccard:hover,.ccard.active{border-color:var(--accent);background:rgba(26,140,255,.06)}
+.ccard-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.ccard-name{font-size:13px;font-weight:600}
+.cbadge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;font-family:'DM Mono',monospace}
+.mbars{display:flex;flex-direction:column;gap:4px}
+.mbar-row{display:flex;align-items:center;gap:8px}
+.mbar-lbl{font-size:10px;color:var(--muted);width:100px;flex-shrink:0}
+.mbar-trk{flex:1;height:5px;background:rgba(255,255,255,.07);border-radius:3px;overflow:hidden}
+.mbar-fil{height:100%;border-radius:3px}
+.mbar-val{font-size:10px;font-family:'DM Mono',monospace;width:28px;text-align:right;flex-shrink:0}
+.legend{padding:11px 15px;border-top:1px solid var(--border);flex-shrink:0}
+.legend h3{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:7px}
+.lgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px}
+.litem{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted)}
+.ldot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* STATS */
+#view-stats{overflow-y:auto;padding:18px 22px;gap:14px}
+.st{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:9px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.pill{padding:4px 13px;border-radius:20px;border:1px solid var(--border2);font-size:12px;font-weight:500;color:var(--muted);cursor:pointer;transition:all .15s;background:var(--bg2)}
+.pill.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pill:hover:not(.active){color:var(--text)}
+.skpis{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:16px}
+.sk{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px 17px}
+.sk-l{font-size:11px;color:var(--muted);margin-bottom:5px}
+.sk-v{font-size:24px;font-weight:600;font-family:'DM Mono',monospace}
+.sk-s{font-size:11px;color:var(--muted);margin-top:3px}
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px}
+.cbox{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px}
+.cbox h3{font-size:13px;font-weight:600;margin-bottom:12px}
+.abrow{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.ab-lbl{font-size:11px;color:var(--muted);width:165px;flex-shrink:0}
+.ab-trk{flex:1;height:16px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden}
+.ab-fil{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:5px;transition:width .4s}
+.ab-fil span{font-size:10px;font-weight:600;color:rgba(255,255,255,.85);font-family:'DM Mono',monospace}
+.recbox{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px;margin-bottom:13px}
+.recbox h3{font-size:13px;font-weight:600;margin-bottom:12px}
+.recgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.reccard{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}
+.reccard-v{font-size:22px;font-weight:600;font-family:'DM Mono',monospace}
+.reccard-l{font-size:10px;color:var(--muted);margin-top:3px}
+.barbox{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px}
+.barbox h3{font-size:13px;font-weight:600;margin-bottom:10px}
+
+/* TABLE */
+#view-table{overflow:hidden;flex-direction:column}
+.ttbar{display:flex;gap:8px;padding:11px 20px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;flex-wrap:wrap;align-items:center}
+.tsel{padding:5px 9px;border-radius:var(--r);border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer}
+.tsel:focus{outline:none;border-color:var(--accent)}
+.tcnt{margin-left:auto;font-size:12px;color:var(--muted);font-family:'DM Mono',monospace}
+.tscroll{flex:1;overflow-y:auto}
+table{width:100%;border-collapse:collapse}
+thead th{position:sticky;top:0;z-index:10;background:var(--bg2);padding:8px 13px;font-size:10px;font-weight:600;color:var(--muted);text-align:left;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border2);white-space:nowrap}
+tbody td{padding:8px 13px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle;white-space:nowrap}
+tbody tr:hover td{background:rgba(255,255,255,.02)}
+.chip{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.ch-red{background:rgba(248,81,73,.15);color:var(--red)}
+.ch-org{background:rgba(227,169,59,.15);color:var(--orange)}
+.ch-blue{background:rgba(26,140,255,.15);color:var(--accent)}
+.ch-teal{background:rgba(31,213,160,.15);color:var(--teal)}
+.ch-gray{background:rgba(139,148,158,.15);color:var(--muted)}
+.ch-pur{background:rgba(155,114,232,.15);color:var(--purple)}
+.ch-pink{background:rgba(229,115,115,.15);color:var(--pink)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:10px}
+
+/* LEAFLET */
+.leaflet-popup-content-wrapper{background:var(--bg2)!important;color:var(--text)!important;border:1px solid var(--border2)!important;border-radius:var(--r)!important;box-shadow:0 8px 32px rgba(0,0,0,.5)!important;min-width:230px!important}
+.leaflet-popup-tip{background:var(--bg2)!important}
+.leaflet-popup-content{margin:12px 14px!important;font-family:'DM Sans',sans-serif!important}
+.pt{font-size:13px;font-weight:600;margin-bottom:2px}
+.ps{font-size:11px;color:var(--muted);margin-bottom:9px}
+.ptbl{width:100%;border-collapse:collapse;font-size:11px}
+.ptbl td{padding:3px 0;vertical-align:top}
+.ptbl td:first-child{color:var(--muted);padding-right:10px;white-space:nowrap}
+.ptbl td:last-child{font-weight:500}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<!-- HEADER -->
+<header>
+  <div class="logo"><svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg></div>
+  <div class="htitle">
+    <h1>SNDE — Cartographie Abonnés Nouakchott</h1>
+    <p>Équipe d'audit · <span id="hinfo">Chargement…</span></p>
+  </div>
+  <div class="hright">
+    <div class="live"><span></span>Données actives</div>
+    <label class="btn-imp">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+      Importer data.json
+      <input type="file" id="file-input" accept=".json" style="display:none" onchange="loadFile(this)"/>
+    </label>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <div class="tab active" onclick="showView('map',this)">Carte satellite</div>
+  <div class="tab" onclick="showView('stats',this)">Statistiques & taux</div>
+  <div class="tab" onclick="showView('table',this)">Données abonnés</div>
+</nav>
+
+<!-- KPI BAR -->
+<div class="kpis">
+  <div class="kpi"><div class="kpi-l">Total abonnés</div><div class="kpi-v c-blue" id="k-total">—</div><div class="kpi-s" id="k-centres">—</div></div>
+  <div class="kpi"><div class="kpi-l">Taux fraude</div><div class="kpi-v c-red" id="k-fraude">—</div><div class="kpi-s" id="k-fraude-n">—</div></div>
+  <div class="kpi"><div class="kpi-l">Taux anomalies</div><div class="kpi-v c-orange" id="k-anom">—</div><div class="kpi-s" id="k-anom-n">—</div></div>
+  <div class="kpi"><div class="kpi-l">Grand solde</div><div class="kpi-v c-purple" id="k-gs">—</div><div class="kpi-s">≥ 6 000 MRU</div></div>
+  <div class="kpi"><div class="kpi-l">Recouvrable</div><div class="kpi-v c-teal" id="k-rec">—</div><div class="kpi-s" id="k-rec-n">—</div></div>
+  <div class="kpi"><div class="kpi-l">DD (déposés)</div><div class="kpi-v c-orange" id="k-dd">—</div><div class="kpi-s" id="k-dd-n">—</div></div>
+  <div class="kpi"><div class="kpi-l">Solde total</div><div class="kpi-v c-red" id="k-solde">—</div><div class="kpi-s">MRU impayé</div></div>
+</div>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- MAP -->
+  <div class="view active" id="view-map">
+    <div id="the-map"></div>
+    <div class="sidebar">
+      <div class="sb-head"><h2>Centres d'audit</h2><p>Cliquer pour zoomer</p></div>
+      <div class="clist" id="clist"></div>
+      <div class="legend">
+        <h3>Légende — Statut</h3>
+        <div class="lgrid">
+          <div class="litem"><div class="ldot" style="background:#f85149"></div>Fraude</div>
+          <div class="litem"><div class="ldot" style="background:#e3a93b"></div>Anomalie</div>
+          <div class="litem"><div class="ldot" style="background:#9b72e8"></div>Grand solde</div>
+          <div class="litem"><div class="ldot" style="background:#1fd5a0"></div>Normal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="view" id="view-stats">
+    <div class="st">Sélectionner un centre</div>
+    <div class="pills" id="pills"></div>
+    <div class="skpis" id="skpis"></div>
+    <div class="cgrid">
+      <div class="cbox"><h3>Anomalies par type</h3><div id="anom-bars"></div></div>
+      <div class="cbox">
+        <h3>Recouvrement</h3>
+        <div style="display:flex;align-items:center;gap:18px">
+          <div style="position:relative;width:110px;height:110px;flex-shrink:0"><canvas id="donut" width="110" height="110"></canvas></div>
+          <div id="donut-leg" style="flex:1"></div>
+        </div>
+      </div>
+    </div>
+    <div class="recbox">
+      <h3>Détail recouvrement</h3>
+      <div class="recgrid" id="recgrid"></div>
+    </div>
+    <div class="barbox">
+      <h3>Comparaison centres — % anomalies par type</h3>
+      <div style="position:relative;height:160px"><canvas id="barchart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="view" id="view-table">
+    <div class="ttbar">
+      <select class="tsel" id="f-centre" onchange="onFilterChange()"><option value="">Tous les centres</option></select>
+      <select class="tsel" id="f-secteur" onchange="filterTable()"><option value="">Tous les secteurs</option></select>
+      <select class="tsel" id="f-statut" onchange="filterTable()">
+        <option value="">Tous statuts</option>
+        <option>Fraude</option><option>Anomalie</option><option>Grand solde</option><option>Normal</option>
+      </select>
+      <select class="tsel" id="f-anom" onchange="filterTable()">
+        <option value="">Toutes anomalies</option>
+        <option value="—">Aucune (—)</option>
+        <option>Fraude</option>
+        <option>Fausse adresse</option>
+        <option>Espace vide</option>
+        <option>Compteur non conforme</option>
+        <option>Double abonnement</option>
+        <option>Fausse tarif</option>
+        <option>À vérifier</option>
+        <option>Observation</option>
+      </select>
+      <select class="tsel" id="f-etat" onchange="filterTable()"><option value="">Tous états compteur</option></select>
+      <select class="tsel" id="f-rec" onchange="filterTable()">
+        <option value="">Tous recouvrements</option>
+        <option>Recouvrable</option>
+        <option>Non recouvrable</option>
+        <option>Recouvrable (grand solde)</option>
+        <option>Non relevé (PF)</option>
+        <option value="Échéancier">Échéancier…</option>
+      </select>
+      <div class="tcnt" id="tcnt">0 abonnés</div>
+    </div>
+    <div class="tscroll">
+      <table>
+        <thead><tr>
+          <th>Réf.</th><th>Nom</th><th>Centre</th><th>Secteur</th><th>Zone</th>
+          <th>N° Compteur</th><th>Statut</th><th>Anomalie</th>
+          <th>État compteur</th><th>Solde (MRU)</th><th>Index</th>
+          <th>Recouvrement</th><th>Tarif</th><th>Dernier paiement</th><th>Obs. originale</th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /.content -->
+</div><!-- /.shell -->
+
+<script>
+/* ══════════════════════════════════════════
+   CONFIG ANOMALIES — adaptez ici si vous
+   ajoutez de nouveaux types de centres
+══════════════════════════════════════════ */
+const ANOMALIE_TYPES = [
+  "Fraude",
+  "Fausse adresse",
+  "Espace vide",
+  "Compteur non conforme",
+  "Double abonnement",
+  "Fausse tarif",
+  "À vérifier",
+  "Observation",
+];
+
+const ANOMALIE_COLORS = {
+  "Fraude":                "#f85149",
+  "Fausse adresse":        "#e3a93b",
+  "Espace vide":           "#8b949e",
+  "Compteur non conforme": "#e3a93b",
+  "Double abonnement":     "#9b72e8",
+  "Fausse tarif":          "#e57373",
+  "À vérifier":            "#1a8cff",
+  "Observation":           "#444",
+  "—":                     "#2a2a2a",
+};
+
+const STATUT_COLORS = {
+  "Fraude":      "#f85149",
+  "Anomalie":    "#e3a93b",
+  "Grand solde": "#9b72e8",
+  "Normal":      "#1fd5a0",
+};
+
+/* ══════════════════════════════════════════
+   DONNÉES
+   Le dashboard charge data.json automatiquement.
+   Les champs attendus correspondent exactement
+   aux colonnes produites par votre notebook :
+   reference, nom, code centre, secteur, Zone,
+   adress, solde client, Index, etat_compteur,
+   tarif client, Date Dernier Paiement,
+   moyenne consommation mensuelle,
+   anomalie, recouvrement, statut, latitude, longitude
+   + centreColor (optionnel, défaut #1a8cff)
+══════════════════════════════════════════ */
+let DATA = [];
+
+function loadData() {
+  fetch("data.json")
+    .then(r => { if (!r.ok) throw 0; return r.json(); })
+    .then(d  => { DATA = d; boot(); })
+    .catch(() => { DATA = []; boot(); });
+}
+
+function boot() {
+  updateKPIs();
+  renderMapMarkers();
+  renderCentreList();
+  document.getElementById("hinfo").textContent =
+    DATA.length + " abonnés · " + uniqueCentres().length + " centre(s)";
+}
+
+/* ══════════════════════════════════════════
+   HELPERS
+══════════════════════════════════════════ */
+function uniqueCentres() { return [...new Set(DATA.map(x => x["code centre"] || x.centre || "—"))]; }
+function centreColor(c)  { const ab = DATA.find(x => (x["code centre"]||x.centre) === c); return ab?.centreColor || "#1a8cff"; }
+
+function statut(ab) {
+  const anom = ab.anomalie;
+  const sol  = parseFloat(ab["solde client"] || ab.solde || 0);
+  if (anom === "Fraude")     return "Fraude";
+  if (anom && anom !== "—" && anom !== "Recouvrable") return "Anomalie";
+  if (sol >= 6000)           return "Grand solde";
+  return "Normal";
+}
+
+function pct(n, t) { return t ? Math.round(n / t * 100) : 0; }
+
+function calcStats(centre) {
+  const d = centre ? DATA.filter(x => (x["code centre"]||x.centre) === centre) : DATA;
+  const total = d.length; if (!total) return null;
+
+  const fraudes  = d.filter(x => statut(x) === "Fraude").length;
+  const anomalies= d.filter(x => statut(x) === "Anomalie").length;
+  const grandS   = d.filter(x => statut(x) === "Grand solde").length;
+
+  const recouv   = d.filter(x => x.recouvrement === "Recouvrable").length;
+  const recGS    = d.filter(x => x.recouvrement === "Recouvrable (grand solde)").length;
+  const nonRec   = d.filter(x => x.recouvrement === "Non recouvrable").length;
+  const pf       = d.filter(x => x.recouvrement === "Non relevé (PF)").length;
+  const echeance = d.filter(x => x.recouvrement && x.recouvrement.startsWith("Échéancier")).length;
+
+  const dd = d.filter(x => {
+    const e = (x.etat_compteur || x.etatCompteur || "").trim().toLowerCase();
+    return e === "dd" || e === " dd";
+  }).length;
+
+  const soldeTotal = d.reduce((s, x) => s + parseFloat(x["solde client"] || x.solde || 0), 0);
+
+  const anomByType = {};
+  ANOMALIE_TYPES.forEach(a => { anomByType[a] = d.filter(x => x.anomalie === a).length; });
+
+  const etatByType = {};
+  d.forEach(x => {
+    const e = (x.etat_compteur || x.etatCompteur || "Inconnu").trim();
+    etatByType[e] = (etatByType[e] || 0) + 1;
+  });
+
+  return { total, fraudes, anomalies, grandS, recouv, recGS, nonRec, pf, echeance, dd, soldeTotal, anomByType, etatByType, d };
+}
+
+/* ══════════════════════════════════════════
+   KPI GLOBAUX
+══════════════════════════════════════════ */
+function updateKPIs() {
+  const s = calcStats(null); if (!s) return;
+  document.getElementById("k-total").textContent   = s.total;
+  document.getElementById("k-centres").textContent = uniqueCentres().length + " centre(s)";
+  document.getElementById("k-fraude").textContent  = pct(s.fraudes, s.total) + "%";
+  document.getElementById("k-fraude-n").textContent= s.fraudes + " cas";
+  document.getElementById("k-anom").textContent    = pct(s.anomalies, s.total) + "%";
+  document.getElementById("k-anom-n").textContent  = s.anomalies + " cas";
+  document.getElementById("k-gs").textContent      = s.grandS;
+  document.getElementById("k-rec").textContent     = pct(s.recouv + s.recGS, s.total) + "%";
+  document.getElementById("k-rec-n").textContent   = (s.recouv + s.recGS) + " ab. · " + s.echeance + " échéancier(s)";
+  document.getElementById("k-dd").textContent      = s.dd;
+  document.getElementById("k-dd-n").textContent    = "compteurs déposés";
+  document.getElementById("k-solde").textContent   = Math.round(s.soldeTotal).toLocaleString("fr-FR");
+}
+
+/* ══════════════════════════════════════════
+   MAP
+══════════════════════════════════════════ */
+let map, mkrs = [];
+
+function initMap() {
+  map = L.map("the-map", { center: [18.094, -15.972], zoom: 13 });
+  L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { attribution: "Esri World Imagery", maxZoom: 19 }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png",
+    { maxZoom: 19, opacity: .7 }).addTo(map);
+}
+
+function renderMapMarkers() {
+  if (!map) return;
+  mkrs.forEach(m => map.removeLayer(m)); mkrs = [];
+
+  DATA.forEach(ab => {
+    const lat = parseFloat(ab.latitude || ab.lat);
+    const lng = parseFloat(ab.longitude || ab.lng);
+    if (isNaN(lat) || isNaN(lng)) return;
+
+    const st  = statut(ab);
+    const col = STATUT_COLORS[st] || "#888";
+    const sol = parseFloat(ab["solde client"] || ab.solde || 0);
+    const m   = L.circleMarker([lat, lng], { radius: 7, fillColor: col, color: "rgba(0,0,0,.3)", weight: 1.5, fillOpacity: .9 }).addTo(map);
+
+    m.bindPopup(`
+      <div class="pt">${ab.reference || ab.id || "—"} · ${ab.nom || "—"}</div>
+      <div class="ps">${ab["code centre"]||ab.centre||"—"} · ${ab.secteur||"—"} · ${ab.Zone||ab.zone||""}</div>
+      <span class="chip ${chipSt(st)}">${st}</span>
+      ${ab.anomalie && ab.anomalie !== "—" ? `<span class="chip ${chipAn(ab.anomalie)}" style="margin-left:4px">${ab.anomalie}</span>` : ""}
+      <table class="ptbl" style="margin-top:10px">
+        <tr><td>N° compteur</td><td>${ab["numero compteur"]||ab.numCompteur||"—"}</td></tr>
+        <tr><td>État compteur</td><td>${ab.etat_compteur||ab.etatCompteur||"—"}</td></tr>
+        <tr><td>Index</td><td>${ab.Index||ab.index||"—"}</td></tr>
+        <tr><td>Solde</td><td><b>${Math.round(sol).toLocaleString("fr-FR")} MRU</b></td></tr>
+        <tr><td>Tarif</td><td>${ab["tarif client"]||ab.tarif||"—"}</td></tr>
+        <tr><td>Conso. moy.</td><td>${ab["moyenne consommation mensuelle"]||ab.consommation||"—"} m³/mois</td></tr>
+        <tr><td>Dernier paiement</td><td>${ab["Date Dernier Paiement"]||ab.dernierPaiement||"—"}</td></tr>
+        <tr><td>Recouvrement</td><td>${chipRecHTML(ab.recouvrement)}</td></tr>
+        ${ab.Obs||ab.obsOriginal ? `<tr><td>Obs.</td><td style="color:#8b949e;font-size:10px">${ab.Obs||ab.obsOriginal}</td></tr>` : ""}
+      </table>
+    `);
+    mkrs.push(m);
+  });
+
+  // Labels centres
+  uniqueCentres().forEach(c => {
+    const s = calcStats(c); if (!s || !s.d.length) return;
+    const lat = s.d.reduce((a, x) => a + parseFloat(x.latitude||x.lat||0), 0) / s.total;
+    const lng = s.d.reduce((a, x) => a + parseFloat(x.longitude||x.lng||0), 0) / s.total;
+    const col = centreColor(c);
+    const icon = L.divIcon({
+      html: `<div style="background:${col};color:#fff;padding:5px 10px;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.5);line-height:1.4">
+        ${c}<br><span style="font-weight:400;font-size:10px;opacity:.85">${pct(s.fraudes + s.anomalies, s.total)}% anomalies · ${s.total} ab.</span></div>`,
+      className: "", iconAnchor: [60, 20]
+    });
+    mkrs.push(L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map));
+  });
+}
+
+function renderCentreList() {
+  const el = document.getElementById("clist"); el.innerHTML = "";
+  uniqueCentres().forEach(c => {
+    const s = calcStats(c); if (!s) return;
+    const col = centreColor(c);
+    const card = document.createElement("div");
+    card.className = "ccard";
+    card.innerHTML = `
+      <div class="ccard-top">
+        <div class="ccard-name">${c}</div>
+        <span class="cbadge" style="background:${col}22;color:${col}">${s.total} ab.</span>
+      </div>
+      <div class="mbars">
+        ${mbar("Fraudes",          pct(s.fraudes,   s.total), "#f85149")}
+        ${mbar("Anomalies",        pct(s.anomalies, s.total), "#e3a93b")}
+        ${mbar("Recouvrable",      pct(s.recouv + s.recGS, s.total), "#1fd5a0")}
+        ${mbar("DD (déposés)",     pct(s.dd,        s.total), "#9b72e8")}
+      </div>`;
+    card.onclick = () => {
+      document.querySelectorAll(".ccard").forEach(x => x.classList.remove("active"));
+      card.classList.add("active");
+      if (s.d.length) {
+        const lat = s.d.reduce((a, x) => a + parseFloat(x.latitude||x.lat||0), 0) / s.total;
+        const lng = s.d.reduce((a, x) => a + parseFloat(x.longitude||x.lng||0), 0) / s.total;
+        map.setView([lat, lng], 15, { animate: true });
+      }
+    };
+    el.appendChild(card);
+  });
+}
+
+function mbar(lbl, val, col) {
+  return `<div class="mbar-row">
+    <div class="mbar-lbl">${lbl}</div>
+    <div class="mbar-trk"><div class="mbar-fil" style="width:${val}%;background:${col}"></div></div>
+    <div class="mbar-val">${val}%</div>
+  </div>`;
+}
+
+/* ══════════════════════════════════════════
+   STATS VIEW
+══════════════════════════════════════════ */
+let donutChart = null, barChart = null;
+
+function initStatPills() {
+  const wrap = document.getElementById("pills"); wrap.innerHTML = "";
+  const cs   = uniqueCentres();
+  cs.forEach((c, i) => {
+    const p = document.createElement("div");
+    p.className = "pill" + (i === 0 ? " active" : "");
+    p.textContent = c;
+    p.onclick = () => { document.querySelectorAll(".pill").forEach(x => x.classList.remove("active")); p.classList.add("active"); renderStats(c); };
+    wrap.appendChild(p);
+  });
+  if (cs.length) renderStats(cs[0]);
+}
+
+function renderStats(c) {
+  const s = calcStats(c); if (!s) return;
+
+  // KPIs
+  document.getElementById("skpis").innerHTML = `
+    <div class="sk"><div class="sk-l">Total abonnés</div><div class="sk-v c-blue">${s.total}</div><div class="sk-s">${[...new Set(s.d.map(x=>x.secteur))].length} secteurs</div></div>
+    <div class="sk"><div class="sk-l">Taux fraude</div><div class="sk-v c-red">${pct(s.fraudes,s.total)}%</div><div class="sk-s">${s.fraudes} cas</div></div>
+    <div class="sk"><div class="sk-l">Taux anomalies</div><div class="sk-v c-orange">${pct(s.anomalies,s.total)}%</div><div class="sk-s">${s.anomalies} cas</div></div>
+    <div class="sk"><div class="sk-l">Solde impayé</div><div class="sk-v" style="font-size:16px;color:var(--purple)">${Math.round(s.soldeTotal).toLocaleString("fr-FR")}</div><div class="sk-s">MRU · ${s.grandS} grands soldes (≥6000)</div></div>
+  `;
+
+  // Barres anomalies
+  const anomFilt = ANOMALIE_TYPES.filter(a => s.anomByType[a] > 0);
+  const maxA     = Math.max(...anomFilt.map(a => s.anomByType[a]), 1);
+  document.getElementById("anom-bars").innerHTML = anomFilt.length
+    ? anomFilt.sort((a,b)=>s.anomByType[b]-s.anomByType[a]).map(a => `
+        <div class="abrow">
+          <div class="ab-lbl">${a}</div>
+          <div class="ab-trk"><div class="ab-fil" style="width:${pct(s.anomByType[a],maxA)}%;background:${ANOMALIE_COLORS[a]||'#888'}">
+            <span>${s.anomByType[a]}</span></div></div>
+        </div>`).join("")
+    : `<div style="color:var(--muted);font-size:12px">Aucune anomalie détectée</div>`;
+
+  // Donut recouvrement
+  const dVals   = [s.recouv, s.recGS, s.echeance, s.nonRec, s.pf];
+  const dLabels = ["Recouvrable", "Recouvrable GS", "Échéancier", "Non recouvrable", "Non relevé (PF)"];
+  const dColors = ["#1fd5a0", "#3fb950", "#1a8cff", "#f85149", "#8b949e"];
+  if (donutChart) donutChart.destroy();
+  donutChart = new Chart(document.getElementById("donut"), {
+    type: "doughnut",
+    data: { datasets: [{ data: dVals, backgroundColor: dColors, borderWidth: 0 }] },
+    options: { responsive: false, cutout: "68%", plugins: { legend: { display: false } } }
+  });
+  document.getElementById("donut-leg").innerHTML = dLabels.map((l, i) => dVals[i] > 0 ? `
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:11px;color:var(--muted)">
+      <span style="width:8px;height:8px;border-radius:2px;background:${dColors[i]};display:inline-block;flex-shrink:0"></span>
+      ${l} · <b style="color:var(--text)">${dVals[i]}</b>
+    </div>` : "").join("");
+
+  // Détail recouvrement — cartes
+  const recTypes = [
+    { lbl: "Recouvrable",        val: s.recouv,   col: "#1fd5a0" },
+    { lbl: "Recouvrable GS",     val: s.recGS,    col: "#3fb950" },
+    { lbl: "Échéancier",         val: s.echeance, col: "#1a8cff" },
+    { lbl: "Non recouvrable",    val: s.nonRec,   col: "#f85149" },
+    { lbl: "Non relevé (PF)",    val: s.pf,       col: "#8b949e" },
+  ];
+  document.getElementById("recgrid").innerHTML = recTypes.map(r => `
+    <div class="reccard">
+      <div class="reccard-v" style="color:${r.col}">${r.val}</div>
+      <div class="reccard-l">${r.lbl}</div>
+    </div>`).join("");
+
+  // Bar chart comparaison
+  const cs = uniqueCentres();
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById("barchart"), {
+    type: "bar",
+    data: {
+      labels: cs,
+      datasets: ANOMALIE_TYPES.filter(a => cs.some(cx => (calcStats(cx)?.anomByType[a] || 0) > 0)).map(a => ({
+        label: a,
+        data: cs.map(cx => pct(calcStats(cx)?.anomByType[a] || 0, calcStats(cx)?.total || 1)),
+        backgroundColor: ANOMALIE_COLORS[a] + "cc",
+        borderRadius: 3,
+        borderSkipped: false,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: "#8b949e", font: { size: 10 }, boxWidth: 10, padding: 8 } } },
+      scales: {
+        x: { stacked: true, ticks: { color: "#8b949e", font: { size: 10 } }, grid: { display: false }, border: { color: "rgba(255,255,255,.07)" } },
+        y: { stacked: true, beginAtZero: true, ticks: { callback: v => v + "%", color: "#8b949e", font: { size: 10, family: "DM Mono" } }, grid: { color: "rgba(255,255,255,.04)" }, border: { color: "rgba(255,255,255,.07)" } }
+      }
+    }
+  });
+}
+
+/* ══════════════════════════════════════════
+   TABLE
+══════════════════════════════════════════ */
+let tableInited = false;
+
+function initTable() {
+  if (!tableInited) {
+    const fc = document.getElementById("f-centre");
+    uniqueCentres().forEach(c => { const o = document.createElement("option"); o.value = c; o.textContent = c; fc.appendChild(o); });
+    const etats = [...new Set(DATA.map(x => (x.etat_compteur||x.etatCompteur||"").trim()).filter(Boolean))];
+    const fe = document.getElementById("f-etat");
+    etats.forEach(e => { const o = document.createElement("option"); o.value = e; o.textContent = e; fe.appendChild(o); });
+    tableInited = true;
+  }
+  // Toujours repeupler les secteurs au init
+  peupleSecteurs("");
+  filterTable();
+}
+
+function peupleSecteurs(centreFiltre) {
+  const fse = document.getElementById("f-secteur");
+  const cur = fse.value;
+  fse.innerHTML = '<option value="">Tous les secteurs</option>';
+  const sects = [...new Set(
+    DATA.filter(x => !centreFiltre || (x["code centre"]||x.centre) === centreFiltre)
+        .map(x => x.secteur)
+        .filter(Boolean)
+  )].sort();
+  sects.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s; o.textContent = s;
+    if (s === cur) o.selected = true;
+    fse.appendChild(o);
+  });
+}
+
+function onFilterChange() {
+  const fc = document.getElementById("f-centre").value;
+  peupleSecteurs(fc);
+  filterTable();
+}
+
+function filterTable() {
+  const fc  = document.getElementById("f-centre").value;
+  const fse = document.getElementById("f-secteur").value;
+  const fst = document.getElementById("f-statut").value;
+  const fa  = document.getElementById("f-anom").value;
+  const fe  = document.getElementById("f-etat").value;
+  const fr  = document.getElementById("f-rec").value;
+  let d = DATA;
+  if (fc)  d = d.filter(x => (x["code centre"]||x.centre) === fc);
+  if (fse) d = d.filter(x => x.secteur === fse);
+  if (fst) d = d.filter(x => statut(x) === fst);
+  if (fa)  d = d.filter(x => x.anomalie === fa);
+  if (fe)  d = d.filter(x => (x.etat_compteur||x.etatCompteur||"").trim() === fe);
+  if (fr)  d = d.filter(x => x.recouvrement && x.recouvrement.startsWith(fr));
+  document.getElementById("tcnt").textContent = d.length + " abonnés";
+  const sol = ab => parseFloat(ab["solde client"] || ab.solde || 0);
+  document.getElementById("tbody").innerHTML = d.map(ab => {
+    const st = statut(ab); const s = sol(ab);
+    return `<tr>
+      <td style="font-family:'DM Mono',monospace;font-weight:500">${ab.reference||ab.id||"—"}</td>
+      <td style="max-width:110px;overflow:hidden;text-overflow:ellipsis" title="${ab.nom||''}">${ab.nom||"—"}</td>
+      <td><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${centreColor(ab["code centre"]||ab.centre)};margin-right:5px"></span>${ab["code centre"]||ab.centre||"—"}</td>
+      <td style="color:var(--muted)">${ab.secteur||"—"}</td>
+      <td style="color:var(--muted)">${ab.Zone||ab.zone||"—"}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:11px">${ab["numero compteur"]||ab.numCompteur||"—"}</td>
+      <td><span class="chip ${chipSt(st)}">${st}</span></td>
+      <td>${ab.anomalie&&ab.anomalie!=="—"?`<span class="chip ${chipAn(ab.anomalie)}">${ab.anomalie}</span>`:'<span style="color:#333">—</span>'}</td>
+      <td><span class="chip ${chipEtat(ab.etat_compteur||ab.etatCompteur)}">${(ab.etat_compteur||ab.etatCompteur||"—").trim()}</span></td>
+      <td style="font-family:'DM Mono',monospace;font-weight:500;color:${s>=6000?"var(--purple)":s>2000?"var(--orange)":"var(--text)"}">${Math.round(s).toLocaleString("fr-FR")}</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--muted)">${ab.Index||ab.index||"—"}</td>
+      <td>${chipRecHTML(ab.recouvrement)}</td>
+      <td style="color:var(--muted);font-size:11px">${ab["tarif client"]||ab.tarif||"—"}</td>
+      <td style="color:var(--muted);font-size:11px">${ab["Date Dernier Paiement"]||ab.dernierPaiement||"—"}</td>
+      <td style="color:var(--muted);font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis" title="${ab.Obs||ab.obsOriginal||""}">${ab.Obs||ab.obsOriginal||"—"}</td>
+    </tr>`;
+  }).join("");
+}
+
+/* ══════════════════════════════════════════
+   CHIP HELPERS
+══════════════════════════════════════════ */
+function chipSt(s) {
+  return s==="Fraude"?"ch-red":s==="Anomalie"?"ch-org":s==="Grand solde"?"ch-pur":"ch-teal";
+}
+function chipAn(a) {
+  if (a==="Fraude")                return "ch-red";
+  if (a==="Fausse adresse")        return "ch-org";
+  if (a==="Espace vide")           return "ch-gray";
+  if (a==="Compteur non conforme") return "ch-org";
+  if (a==="Double abonnement")     return "ch-pur";
+  if (a==="Fausse tarif")          return "ch-pink";
+  if (a==="À vérifier")            return "ch-blue";
+  return "ch-gray";
+}
+function chipEtat(e) {
+  if (!e) return "ch-gray";
+  const el = e.trim().toLowerCase();
+  if (el==="dd"||el===" dd")      return "ch-red";
+  if (el==="pf")                  return "ch-gray";
+  if (el==="bloque")              return "ch-org";
+  if (el==="non trouvé")          return "ch-pur";
+  if (el==="inaccessible")        return "ch-gray";
+  if (el.startsWith("coupure"))   return "ch-pink";
+  return "ch-gray";
+}
+function chipRecHTML(r) {
+  if (!r) return "—";
+  if (r==="Recouvrable")               return `<span class="chip ch-teal">Recouvrable</span>`;
+  if (r==="Recouvrable (grand solde)") return `<span class="chip ch-pur">Recouvrable GS</span>`;
+  if (r==="Non recouvrable")           return `<span class="chip ch-red">Non recouvrable</span>`;
+  if (r==="Non relevé (PF)")           return `<span class="chip ch-gray">Non relevé (PF)</span>`;
+  if (r.startsWith("Échéancier"))      return `<span class="chip ch-blue">${r}</span>`;
+  return `<span class="chip ch-gray">${r}</span>`;
+}
+
+/* ══════════════════════════════════════════
+   NAV + IMPORT
+══════════════════════════════════════════ */
+function showView(name, tab) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelectorAll(".tab").forEach(t  => t.classList.remove("active"));
+  document.getElementById("view-" + name).classList.add("active");
+  tab.classList.add("active");
+  if (name === "stats") initStatPills();
+  if (name === "table") initTable();
+  if (name === "map")   setTimeout(() => map.invalidateSize(), 100);
+}
+
+function loadFile(input) {
+  const file = input.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try { DATA = JSON.parse(e.target.result); tableInited = false; boot(); alert(DATA.length + " abonnés chargés."); }
+    catch { alert("Erreur JSON."); }
+  };
+  reader.readAsText(file);
+}
+
+/* ══════════════════════════════════════════
+   INIT
+══════════════════════════════════════════ */
+window.addEventListener("DOMContentLoaded", () => { initMap(); loadData(); });
+</script>
+</body>
+</html>
